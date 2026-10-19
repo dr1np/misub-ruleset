@@ -1,0 +1,238 @@
+# MiSub >= v2.7 / Mihomo: 远程 Clash YAML 配置模板
+# 用法：将此文件托管为可被 MiSub 访问的 HTTPS 原始文本 URL，
+#       在订阅组中使用“内置转换引擎 + 自定义模板 URL”。
+# 警告：不要把此文件当作“节点订阅”导入 MiSub。
+# 节点 proxies 由 MiSub 在生成订阅时自动注入，无须在此硬编码。
+
+mixed-port: 7890
+mode: rule
+log-level: info
+unified-delay: true
+tcp-concurrent: true
+profile:
+  store-selected: true
+
+proxy-groups:
+  - name: 通用代理
+    type: select
+    proxies: [自动选择, DIRECT]
+    include-all: true
+
+  - name: 自动选择
+    type: url-test
+    include-all: true
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+
+  # 关键：OpenAI 与 Google 是独立策略组。导入后分别手动指定出口。
+  - name: OpenAI
+    type: select
+    proxies: [通用代理, 自动选择, DIRECT]
+    include-all: true
+
+  - name: Google
+    type: select
+    proxies: [通用代理, 自动选择, DIRECT]
+    include-all: true
+
+  - name: YouTube
+    type: select
+    proxies: [Google, 通用代理, DIRECT]
+
+  - name: 其他AI
+    type: select
+    proxies: [通用代理, 自动选择, DIRECT]
+    include-all: true
+
+  - name: GitHub
+    type: select
+    proxies: [通用代理, 自动选择, DIRECT]
+
+  - name: Telegram
+    type: select
+    proxies: [通用代理, 自动选择, DIRECT]
+
+  - name: 流媒体
+    type: select
+    proxies: [通用代理, 自动选择, DIRECT]
+
+  - name: Microsoft
+    type: select
+    proxies: [DIRECT, 通用代理]
+
+  - name: Apple
+    type: select
+    proxies: [DIRECT, 通用代理]
+
+  - name: 广告拦截
+    type: select
+    proxies: [REJECT, DIRECT]
+
+  - name: 国内服务
+    type: select
+    proxies: [DIRECT, 通用代理]
+
+  - name: 漏网之鱼
+    type: select
+    proxies: [通用代理, DIRECT]
+
+# 自动更新规则集，使用 MRS 二进制格式。
+# 若 Github Raw 在你的运行环境不可访问，替换为可信的 GitHub 镜像。
+rule-providers:
+  private_domain:
+    type: http
+    behavior: domain
+    format: mrs
+    path: ./ruleset/mcx-private-domain.mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/private.mrs
+    interval: 86400
+  private_ip:
+    type: http
+    behavior: ipcidr
+    format: mrs
+    path: ./ruleset/mcx-private-ip.mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/private.mrs
+    interval: 86400
+  openai_domain:
+    type: http
+    behavior: domain
+    format: mrs
+    path: ./ruleset/mcx-openai.mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/openai.mrs
+    interval: 86400
+  google_domain:
+    type: http
+    behavior: domain
+    format: mrs
+    path: ./ruleset/mcx-google.mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/google.mrs
+    interval: 86400
+  youtube_domain:
+    type: http
+    behavior: domain
+    format: mrs
+    path: ./ruleset/mcx-youtube.mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/youtube.mrs
+    interval: 86400
+  other_ai_domain:
+    type: http
+    behavior: domain
+    format: mrs
+    path: ./ruleset/mcx-ai-noncn.mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/category-ai-!cn.mrs
+    interval: 86400
+  github_domain:
+    type: http
+    behavior: domain
+    format: mrs
+    path: ./ruleset/mcx-github.mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/github.mrs
+    interval: 86400
+  telegram_domain:
+    type: http
+    behavior: domain
+    format: mrs
+    path: ./ruleset/mcx-telegram.mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/telegram.mrs
+    interval: 86400
+  netflix_domain:
+    type: http
+    behavior: domain
+    format: mrs
+    path: ./ruleset/mcx-netflix.mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/netflix.mrs
+    interval: 86400
+  disney_domain:
+    type: http
+    behavior: domain
+    format: mrs
+    path: ./ruleset/mcx-disney.mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/disney.mrs
+    interval: 86400
+  spotify_domain:
+    type: http
+    behavior: domain
+    format: mrs
+    path: ./ruleset/mcx-spotify.mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/spotify.mrs
+    interval: 86400
+  microsoft_domain:
+    type: http
+    behavior: domain
+    format: mrs
+    path: ./ruleset/mcx-microsoft.mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/microsoft.mrs
+    interval: 86400
+  apple_domain:
+    type: http
+    behavior: domain
+    format: mrs
+    path: ./ruleset/mcx-apple.mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/apple.mrs
+    interval: 86400
+  ads_domain:
+    type: http
+    behavior: domain
+    format: mrs
+    path: ./ruleset/mcx-ads.mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/category-ads-all.mrs
+    interval: 86400
+  cn_domain:
+    type: http
+    behavior: domain
+    format: mrs
+    path: ./ruleset/mcx-cn-domain.mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/cn.mrs
+    interval: 86400
+  cn_ip:
+    type: http
+    behavior: ipcidr
+    format: mrs
+    path: ./ruleset/mcx-cn-ip.mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/cn.mrs
+    interval: 86400
+  google_ip:
+    type: http
+    behavior: ipcidr
+    format: mrs
+    path: ./ruleset/mcx-google-ip.mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/google.mrs
+    interval: 86400
+  geolocation_noncn:
+    type: http
+    behavior: domain
+    format: mrs
+    path: ./ruleset/mcx-geolocation-noncn.mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/geolocation-!cn.mrs
+    interval: 86400
+
+# Mihomo 由上至下首条匹配生效。
+rules:
+  # 局域网地址先直连。
+  - RULE-SET,private_domain,DIRECT
+  - RULE-SET,private_ip,DIRECT,no-resolve
+
+  # 专项分流：务必放在通用 AI、国外域名和国内规则之前。
+  - RULE-SET,openai_domain,OpenAI
+  - RULE-SET,youtube_domain,YouTube
+  - RULE-SET,google_domain,Google
+  - RULE-SET,other_ai_domain,其他AI
+  - RULE-SET,github_domain,GitHub
+  - RULE-SET,telegram_domain,Telegram
+  - RULE-SET,netflix_domain,流媒体
+  - RULE-SET,disney_domain,流媒体
+  - RULE-SET,spotify_domain,流媒体
+  - RULE-SET,microsoft_domain,Microsoft
+  - RULE-SET,apple_domain,Apple
+
+  # 广告拦截默认开启。影响正常业务时在策略组选择 DIRECT。
+  - RULE-SET,ads_domain,广告拦截
+
+  # 先域名再 IP，避免不必要的解析和 IP 误判。
+  - RULE-SET,cn_domain,国内服务
+  # Google IP 规则为兜底（覆盖 Google 基础设施，可能包含第三方 GCP）。
+  - RULE-SET,google_ip,Google,no-resolve
+  - RULE-SET,cn_ip,国内服务,no-resolve
+  - RULE-SET,geolocation_noncn,通用代理
+  - MATCH,漏网之鱼
