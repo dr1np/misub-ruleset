@@ -12,6 +12,61 @@ tcp-concurrent: true
 profile:
   store-selected: true
 
+# Explicit Mihomo DNS configuration.
+# MiSub will preserve this block rather than generate its default DNS which
+# points to the missing "🌐 DNS 出口" group.
+# Disable client-side DNS override to use this block; choose a working
+# proxy node for 通用代理 (used only as the DNS transport for overseas lookups).
+dns:
+  enable: true
+  ipv6: false
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter-mode: blacklist
+  fake-ip-filter:
+    - "geosite:private"
+    - "geosite:category-ntp"
+    - "*.lan"
+    - "*.local"
+    - "*.arpa"
+    - "localhost"
+  use-hosts: true
+  use-system-hosts: true
+
+  # DNS transport is explicit via #通用代理, so DNS itself does not
+  # have to recursively follow routing rules.
+  respect-rules: false
+
+  # IP-only bootstrap servers; avoid resolving a DNS resolver via itself.
+  default-nameserver:
+    - 223.5.5.5
+    - 119.29.29.29
+
+  # Resolve proxy node hostnames without depending on the proxy connection.
+  proxy-server-nameserver:
+    - "https://dns.alidns.com/dns-query"
+    - "https://doh.pub/dns-query"
+
+  # Direct connections use domestic resolvers.
+  direct-nameserver:
+    - "https://dns.alidns.com/dns-query"
+    - "https://doh.pub/dns-query"
+  direct-nameserver-follow-policy: false
+
+  # Default queries use encrypted DNS over the existing proxy group.
+  nameserver:
+    - "https://1.1.1.1/dns-query#通用代理"
+    - "https://8.8.8.8/dns-query#通用代理"
+
+  # Domestic/private names bypass the foreign DNS transport.
+  nameserver-policy:
+    "geosite:private":
+      - 223.5.5.5
+      - 119.29.29.29
+    "geosite:cn":
+      - "https://dns.alidns.com/dns-query"
+      - "https://doh.pub/dns-query"
+
 proxy-groups:
   - name: 通用代理
     type: select
