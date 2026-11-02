@@ -6,17 +6,28 @@
 
 mixed-port: 7890
 mode: rule
+ipv6: false
 log-level: info
 unified-delay: true
 tcp-concurrent: true
 profile:
   store-selected: true
 
-# Explicit Mihomo DNS configuration.
-# MiSub will preserve this block rather than generate its default DNS which
-# points to the missing "🌐 DNS 出口" group.
-# Disable client-side DNS override to use this block; choose a working
-# proxy node for 通用代理 (used only as the DNS transport for overseas lookups).
+# 客户端须启用 TUN/服务模式；Clash Verge 的界面设置优先于模板。
+# 严格路由限制 Windows 多网卡 DNS 绕行，但不等于内核退出后的系统断网开关。
+tun:
+  enable: true
+  stack: gvisor
+  auto-route: true
+  auto-detect-interface: true
+  strict-route: true
+  dns-hijack:
+    - any:53
+    - tcp://any:53
+
+# 关闭客户端 DNS 覆写，使用这里的 DNS 设置。
+# 公网域名统一通过“通用代理”加密解析，国内网站的连接仍可按规则直连。
+# 只有代理节点自身的域名需要独立解析，才能在代理建立前完成引导。
 dns:
   enable: true
   ipv6: false
@@ -33,104 +44,86 @@ dns:
   use-hosts: true
   use-system-hosts: true
 
-  # DNS transport is explicit via #通用代理, so DNS itself does not
-  # have to recursively follow routing rules.
+  # 显式指定 DNS 传输代理，避免 DNS 自己递归触发路由解析。
   respect-rules: false
 
-  # IP-only bootstrap servers; avoid resolving a DNS resolver via itself.
+  # 使用 IP 地址形式的加密引导 DNS，不使用 system 或明文公网 DNS。
   default-nameserver:
-    - 223.5.5.5
-    - 119.29.29.29
+    - "https://223.5.5.5/dns-query"
 
-  # Resolve proxy node hostnames without depending on the proxy connection.
+  # 仅查询代理节点域名，显式直连，不能通过尚未建立的代理查询自身。
   proxy-server-nameserver:
-    - "https://dns.alidns.com/dns-query"
-    - "https://doh.pub/dns-query"
+    - "https://223.5.5.5/dns-query#DIRECT"
 
-  # Direct connections use domestic resolvers.
+  # 直连网站也通过代理解析，不因切换到 DIRECT 而改用国内 DNS。
   direct-nameserver:
-    - "https://dns.alidns.com/dns-query"
-    - "https://doh.pub/dns-query"
+    - "https://1.1.1.1/dns-query#通用代理"
+    - "https://8.8.8.8/dns-query#通用代理"
   direct-nameserver-follow-policy: false
 
-  # Default queries use encrypted DNS over the existing proxy group.
+  # 两个加密 DNS 都经过同一个手动选择的海外节点，没有直连回退。
   nameserver:
     - "https://1.1.1.1/dns-query#通用代理"
     - "https://8.8.8.8/dns-query#通用代理"
+  fallback: []
 
-  # Domestic/private names bypass the foreign DNS transport.
-  nameserver-policy:
-    "geosite:private":
-      - 223.5.5.5
-      - 119.29.29.29
-    "geosite:cn":
-      - "https://dns.alidns.com/dns-query"
-      - "https://doh.pub/dns-query"
+  # 不设置 geosite:cn 国内 DNS 分流，避免国外域名因分类重叠被送往国内 DNS。
+  nameserver-policy: {}
 
 proxy-groups:
   - name: 通用代理
     type: select
-    proxies: [自动选择, DIRECT]
+    # 首次导入先阻断，请手动选定海外节点；节点消失后也先阻断。
+    proxies: [REJECT]
     include-all: true
+    exclude-type: "Direct|Compatible|Pass"
+    empty-fallback: REJECT
 
-  - name: 自动选择
-    type: url-test
-    include-all: true
-    url: https://www.gstatic.com/generate_204
-    interval: 300
-    tolerance: 50
-
-  # 关键：OpenAI 与 Google 是独立策略组。导入后分别手动指定出口。
+  # 保留服务分类，但海外出口全部锁定到“通用代理”，不再独立选节点。
   - name: OpenAI
     type: select
-    proxies: [通用代理, 自动选择, DIRECT]
-    include-all: true
+    proxies: [通用代理]
 
   - name: Google
     type: select
-    proxies: [通用代理, 自动选择, DIRECT]
-    include-all: true
+    proxies: [通用代理]
 
   - name: YouTube
     type: select
-    proxies: [Google, 通用代理, DIRECT]
+    proxies: [通用代理]
 
   - name: 其他AI
     type: select
-    proxies: [通用代理, 自动选择, DIRECT]
-    include-all: true
+    proxies: [通用代理]
 
   - name: GitHub
     type: select
-    proxies: [通用代理, 自动选择, DIRECT]
+    proxies: [通用代理]
 
   - name: Telegram
     type: select
-    proxies: [通用代理, 自动选择, DIRECT]
+    proxies: [通用代理]
 
   - name: 流媒体
     type: select
-    proxies: [通用代理, 自动选择, DIRECT]
+    proxies: [通用代理]
 
   - name: Microsoft
     type: select
-    proxies: [DIRECT, 通用代理]
+    proxies: [通用代理]
 
   - name: Apple
     type: select
-    proxies: [DIRECT, 通用代理]
+    proxies: [通用代理]
 
   - name: 广告拦截
     type: select
-    proxies: [REJECT, DIRECT]
+    # 默认按海外流量处理；需要拦截时可手动选择 REJECT。
+    proxies: [通用代理, REJECT]
 
   - name: 国内服务
     type: select
-    proxies: [DIRECT, 通用代理]
-
-  - name: 漏网之鱼
-    type: select
-    proxies: [通用代理, DIRECT]
+    proxies: [DIRECT]
 
 # 自动更新规则集，使用 MRS 二进制格式。
 # 若 Github Raw 在你的运行环境不可访问，替换为可信的 GitHub 镜像。
@@ -268,7 +261,10 @@ rules:
   - RULE-SET,private_domain,DIRECT
   - RULE-SET,private_ip,DIRECT,no-resolve
 
-  # 专项分流：务必放在通用 AI、国外域名和国内规则之前。
+  # 国内域名按 cn_domain 分类直连，不由 DNS 返回的 IP 推断域名归属。
+  - RULE-SET,cn_domain,国内服务
+
+  # 未命中国内域名库的服务流量统一交给“通用代理”。
   - RULE-SET,openai_domain,OpenAI
   - RULE-SET,youtube_domain,YouTube
   - RULE-SET,google_domain,Google
@@ -281,13 +277,22 @@ rules:
   - RULE-SET,microsoft_domain,Microsoft
   - RULE-SET,apple_domain,Apple
 
-  # 广告拦截默认开启。影响正常业务时在策略组选择 DIRECT。
+  # 广告默认走代理，可选阻断，不能选择直连。
   - RULE-SET,ads_domain,广告拦截
 
-  # 先域名再 IP，避免不必要的解析和 IP 误判。
-  - RULE-SET,cn_domain,国内服务
-  # Google IP 规则为兜底（覆盖 Google 基础设施，可能包含第三方 GCP）。
-  - RULE-SET,google_ip,Google,no-resolve
-  - RULE-SET,cn_ip,国内服务,no-resolve
+  # 国外域名先于 IP 规则；不为判断 IP 归属而解析未知域名。
   - RULE-SET,geolocation_noncn,通用代理
-  - MATCH,漏网之鱼
+
+  # 未直连的域名 UDP：节点不支持 UDP 时必须拒绝，不能继续落到 IP 直连。
+  - AND,((NETWORK,udp),(DOMAIN-REGEX,.+)),通用代理
+  - AND,((NETWORK,udp),(DOMAIN-REGEX,.+)),REJECT
+  - RULE-SET,cn_ip,国内服务,no-resolve
+  - RULE-SET,google_ip,Google,no-resolve
+
+  # IP 形式的其余 UDP 同样先尝试代理、不支持则拒绝。
+  # Mihomo 会跳过不支持 UDP 的代理规则，不能让它走到隐式 DIRECT。
+  - NETWORK,udp,通用代理
+  - NETWORK,udp,REJECT
+
+  # 所有其余 TCP/UDP 流量都走手动指定的海外节点，绝不兜底直连。
+  - MATCH,通用代理
