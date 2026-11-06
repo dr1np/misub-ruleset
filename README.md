@@ -11,26 +11,67 @@ https://raw.githubusercontent.com/dr1np/misub-ruleset/main/misub-metacubex-mihom
 ## 出口策略
 
 - 私有域名、局域网 IP 直连。
-- `cn_domain` 规则集中的国内域名直连，国内 IP 直连。
-- 其余流量以 `MATCH,通用代理` 兜底，TCP、UDP 使用同一个手动指定的海外节点。
-- 所有海外服务组只引用“通用代理”。“自动选择”已移除，Microsoft、Apple 也不再默认直连。
-- “通用代理”不提供 `DIRECT`，并排除直连类型的注入节点。首次导入或原选节点被移除时，默认 `REJECT`；请在“通用代理”中手动选择所需的海外节点。选中节点连接失败时不会自动改走直连或其他节点。
+- 服务分类优先于 `cn_domain` 国内域名与国内 IP 规则；其余国内流量默认直连。
+- 其余流量以 `MATCH,通用代理` 兜底，TCP、UDP 使用该组的当前选择。
+- 所有分组都有 `REJECT`；除 Claude、OpenAI、Google 外，所有分组都有 `DIRECT`。Microsoft、Apple 等服务组默认选择“通用代理”，国内服务默认 `DIRECT`。
+- Claude、OpenAI、Google 可分别选择 MiSub 注入的代理节点，并排除 `Direct`、`Compatible`、`Pass` 类型。这三组不引用“通用代理”，因此后者切到 `DIRECT` 时不会连带直连。三组和“通用代理”首次导入均默认 `REJECT`，请分别手动选择所需节点。
+- “通用代理”允许手动选择 `DIRECT`。选中节点连接失败时不会自动改走直连或其他节点。
 - 节点不支持 UDP 时，海外 UDP 由显式拒绝规则阻断，避免 Mihomo 跳过代理规则后隐式直连。
-- 广告默认同样走“通用代理”；如需主动拦截，可以在“广告拦截”中选择 `REJECT`，没有直连选项。
+- 广告拦截的选项顺序为 `REJECT`、通用代理、`DIRECT`，默认拦截。Claude 已确认的服务依赖优先进入 Claude，其余广告优先于其他服务和国内分类。
 
-规则先按域名分类，再匹配带 `no-resolve` 的 IP 规则。未知域名不会为了判断是否属于国内 IP 而额外解析后直连；即使它最终解析到国内 CDN，也仍由代理兜底。直接访问国内 IP 时则直连。域名归属以 MetaCubeX 的 `cn` 规则集为准。
+规则先识别 Claude 原生进程和服务域名，再匹配带 `no-resolve` 的 IP 规则。未知域名不会为了判断是否属于国内 IP 而额外解析后直连；即使它最终解析到国内 CDN，也仍由“通用代理”兜底。直接访问国内 IP 时默认直连。域名归属以 MetaCubeX 的规则集为准。
+
+## Claude 覆盖范围与依据
+
+核对日期：2026-11-07。采用 MetaCubeX `anthropic.mrs` 每日更新，叠加模板内置规则，避免只匹配 `claude.ai` 而遗漏登录、文件或新产品域名。
+
+| 请求类型 | 分流方式 |
+| --- | --- |
+| 网站、API、Console、OAuth/SSO、下载与更新 | `anthropic.com`、`claude.ai`、`claude.com` 等完整后缀，包括所有子域名 |
+| 文件、Artifacts、Chrome WebSocket、MCP 内容 | `claudeusercontent.com`、`claudemcpcontent.com`、`claudemcpclient.com` 等后缀 |
+| 官网 CDN | 精确匹配 `servd-anthropic-website.b-cdn.net` |
+| 插件元数据、旧版安装器 | 精确匹配 `storage.googleapis.com` |
+| 当前可选遥测 | 官方文档列出的两个 Datadog 接收主机 |
+| 旧版功能开关、统计 | 社区记录的 Statsig、GrowthBook、Fathom 主机 |
+| Artifacts 外部字体、脚本 | 官方列出的 Google Fonts、cdnjs、jsDelivr、Tailwind、jQuery、unpkg 主机 |
+| 原生 CLI、桌面端及其同名 Helper | 识别 `claude`、`claude.exe`、`Claude.exe`、`claude-desktop`、`Claude Helper` 及 Renderer/GPU/Plugin Helper；局域网规则优先，其他请求进入 Claude |
+| 直接访问官方 API IP | 官方 Inbound 网段 `160.79.104.0/23`、`153.61.224.0/22`，预留 `2607:6bc0::/48`；模板仍关闭 IPv6 |
+
+Claude 域名和原生进程规则优先于广告、Google、其他AI及国内服务；其选中节点不支持 UDP 时立即 `REJECT`，不会落入其他分组。Claude 的功能开关和遥测属于该组的完整请求范围；需要关闭可选遥测时，使用 Claude 自身设置。
+
+共享域名有明确取舍：上述 GCS、字体、脚本 CDN 和遥测主机也可能被其他网站使用，它们的请求同样会进入 Claude。Mihomo 的域名规则不能根据 HTTPS URL 路径区分同一主机上的 Claude 对象和其他对象；没有把整个 `googleapis.com`、`gstatic.com`、`cloudflare.com`、`amazonaws.com` 或全部 CDN IP 加入 Claude。
+
+GitHub、npm、Homebrew、用户配置的 MCP、Bedrock/Vertex/Foundry、自定义网关和工具访问的任意网站，不存在可穷举的 Claude 专属域名清单。原生 Claude 进程直接发出的公网请求由进程规则覆盖；它启动的 `git`、`node`、`curl` 等子进程、npm 版 CLI、浏览器、WSL/容器流量若无法识别为 Claude，则按各自域名分类。没有全局匹配 `node.exe`、浏览器或 `git.exe`。远端云会话发出的请求也不经过本地 Mihomo。因此这里覆盖已核对的已知请求，不能承诺未来所有请求百分之百识别。
+
+参考来源：
+
+- [Claude Code 官方网络要求](https://code.claude.com/docs/en/network-config)：登录、插件、Chrome 桥接、当前遥测和 Artifacts 依赖。
+- [Anthropic 官方 IP 地址](https://platform.claude.com/docs/en/api/ip-addresses)：只采用 Inbound 网段，不混入 Outbound 网段。
+- [MetaCubeX Anthropic 域名清单](https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/anthropic.list)：持续更新的厂商与产品域名。
+- [blackmatrix7 社区补全讨论 #1671](https://github.com/blackmatrix7/ios_rule_script/pull/1671)：旧清单缺少 `claude.com`、用户内容域名和功能开关的经验；不照抄缺乏独立依据的域名。
+- [xiaolai 社区规则登记表](https://github.com/xiaolai/anthropic-claude-surge-rules-set/blob/main/domains.yaml)：更新器的 GCS 依赖及 GrowthBook 记录。
+- [Claude Code 社区故障 #8248](https://github.com/anthropics/claude-code/issues/8248)：功能开关请求可能导致启动长时间等待。
+- [Anthropic 官方开发容器配置](https://github.com/anthropics/claude-code/blob/main/.devcontainer/init-firewall.sh)：历史 Statsig 依赖。
+- [社区版本审计](https://gist.github.com/AdnaneKhan/7a2040bcdebdc923ef73a19f8831132d)：不同版本的遥测端点会变化，当前端点以官方文档为准。
+
+实际验收时在 Mihomo 连接日志中检查网页登录、对话流式响应、文件上传/下载、Artifacts、Claude Code 登录与对话、插件列表、自动更新和 Chrome 桥接；确认目标请求命中 Claude 并使用选定节点。规则语法与离线分类检查不能代替带账号的端到端验证。
+
+本次验证使用 Mihomo 1.19.33：完整模板语法通过；18 个远程规则集均可下载，另有 3 个内置规则集；13 个分组选项、56 个域名/IP 的实际 TCP 路由、广告默认拒绝、Claude/OpenAI/Google 三组不支持 UDP 时的拒绝均通过。使用本地模拟代理检查出口，不调用厂商账号。另以测试用 `claude.exe` 验证未知域名的进程分流，并确认“通用代理”切到 `DIRECT` 不会改变三组的选中节点。
 
 ## DNS 与客户端设置
 
-普通公网域名统一使用经过“通用代理”的 Cloudflare / Google DoH。直连网站的 DNS 查询也经过代理，没有国内 DNS 分流策略或直连回退。代理节点自身的域名使用独立的阿里 DoH 直连解析，避免在建立代理前依赖代理查询自身。这项引导解析不能提供与代理内查询相同的隐私边界。
+普通公网域名统一使用经过“通用代理”当前选择的 Cloudflare / Google DoH。直连网站的 DNS 查询也使用该选择，没有国内 DNS 分流策略或自动直连回退。代理节点自身的域名使用独立的阿里 DoH 直连解析，避免在建立代理前依赖代理查询自身。这项引导解析不能提供与代理内查询相同的隐私边界。
+
+“通用代理”选中代理节点时，公网 DNS 经该节点；手动选中 `DIRECT` 时，DNS 也随之直连，Claude、OpenAI、Google 的连接仍使用各自节点。三组的独立分流不表示 DNS 查询也分别使用它们的出口。
 
 客户端需满足以下条件：
 
 1. 使用 Mihomo 的**规则模式**，关闭会覆盖模板的客户端 DNS 覆写。
 2. 开启 TUN、自动路由、严格路由及 UDP/TCP DNS 劫持；Windows 需服务模式或相应权限。模板已包含这些设置，Clash Verge 的界面设置仍可能覆盖它们。
 3. 保持模板的 IPv6 关闭设置，除非已另外验证 IPv6 的完整接管。
-4. 更新订阅后，检查“通用代理”的选中节点；首次导入默认阻断，需要手动选择海外节点。
+4. 更新订阅后，分别检查“通用代理”、Claude、OpenAI、Google 的选中节点；首次导入默认阻断，需要手动选择。
+5. `profile.store-selected: true` 会保留已有选择；旧配置曾选中广告代理时，更新后请手动将“广告拦截”切到 `REJECT`。默认值针对没有已保存选择的导入。进程识别依赖客户端权限和运行环境。
 
-节点不可用时，未命中直连规则的流量和公网 DNS 查询会失败；未缓存的国内域名也可能因 DNS 无法经代理查询而暂时无法访问。已有国内域名/IP 直连规则不会因为海外节点掉线被改成代理。
+“通用代理”的节点不可用时，使用该组的连接和公网 DNS 查询会失败；未缓存的国内域名、独立服务域名也可能因 DNS 无法经该组查询而暂时无法访问。已有国内域名/IP 直连规则不会因为海外节点掉线被改成代理。
 
 此模板保证的是 **Mihomo 运行且流量已被接管时的分流和代理失败行为**。它不能代替操作系统级断网开关：退出内核、关闭 TUN、应用自行绕过代理，或使用独立加密 DNS 时，需另行检查实际路径。DNS 检测应结合解析器归属和实际请求路径判断，DNS 服务器 IP 无须与代理出口 IP 相同。

@@ -10,6 +10,7 @@ ipv6: false
 log-level: info
 unified-delay: true
 tcp-concurrent: true
+find-process-mode: strict
 profile:
   store-selected: true
 
@@ -61,7 +62,7 @@ dns:
     - "https://8.8.8.8/dns-query#通用代理"
   direct-nameserver-follow-policy: false
 
-  # 两个加密 DNS 都经过同一个手动选择的海外节点，没有直连回退。
+  # 两个加密 DNS 都经过“通用代理”的当前选择，没有自动直连回退。
   nameserver:
     - "https://1.1.1.1/dns-query#通用代理"
     - "https://8.8.8.8/dns-query#通用代理"
@@ -74,58 +75,71 @@ proxy-groups:
   - name: 通用代理
     type: select
     # 首次导入先阻断，请手动选定海外节点；节点消失后也先阻断。
+    proxies: [REJECT, DIRECT]
+    include-all: true
+    exclude-type: "Compatible|Pass"
+    empty-fallback: REJECT
+
+  # 三个服务组独立选节点，不引用可切换 DIRECT 的“通用代理”。
+  - name: Claude
+    type: select
     proxies: [REJECT]
     include-all: true
     exclude-type: "Direct|Compatible|Pass"
     empty-fallback: REJECT
 
-  # 保留服务分类，但海外出口全部锁定到“通用代理”，不再独立选节点。
   - name: OpenAI
     type: select
-    proxies: [通用代理]
+    proxies: [REJECT]
+    include-all: true
+    exclude-type: "Direct|Compatible|Pass"
+    empty-fallback: REJECT
 
   - name: Google
     type: select
-    proxies: [通用代理]
+    proxies: [REJECT]
+    include-all: true
+    exclude-type: "Direct|Compatible|Pass"
+    empty-fallback: REJECT
 
   - name: YouTube
     type: select
-    proxies: [通用代理]
+    proxies: [通用代理, REJECT, DIRECT]
 
   - name: 其他AI
     type: select
-    proxies: [通用代理]
+    proxies: [通用代理, REJECT, DIRECT]
 
   - name: GitHub
     type: select
-    proxies: [通用代理]
+    proxies: [通用代理, REJECT, DIRECT]
 
   - name: Telegram
     type: select
-    proxies: [通用代理]
+    proxies: [通用代理, REJECT, DIRECT]
 
   - name: 流媒体
     type: select
-    proxies: [通用代理]
+    proxies: [通用代理, REJECT, DIRECT]
 
   - name: Microsoft
     type: select
-    proxies: [通用代理]
+    proxies: [通用代理, REJECT, DIRECT]
 
   - name: Apple
     type: select
-    proxies: [通用代理]
+    proxies: [通用代理, REJECT, DIRECT]
 
   - name: 广告拦截
     type: select
-    # 默认按海外流量处理；需要拦截时可手动选择 REJECT。
-    proxies: [通用代理, REJECT]
+    # 首次导入默认拦截；也可手动选择代理或直连。
+    proxies: [REJECT, 通用代理, DIRECT]
 
   - name: 国内服务
     type: select
-    proxies: [DIRECT]
+    proxies: [DIRECT, REJECT]
 
-# 自动更新规则集，使用 MRS 二进制格式。
+# 远程规则集自动更新，使用 MRS 二进制格式；Claude 补充规则内置于模板。
 # 若 Github Raw 在你的运行环境不可访问，替换为可信的 GitHub 镜像。
 rule-providers:
   private_domain:
@@ -142,6 +156,64 @@ rule-providers:
     path: ./ruleset/mcx-private-ip.mrs
     url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/private.mrs
     interval: 86400
+  claude_domain:
+    type: http
+    behavior: domain
+    format: mrs
+    path: ./ruleset/mcx-anthropic.mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/anthropic.mrs
+    interval: 86400
+  # 核对来源和共享域名影响见 README；保留核心域名，避免上游删除或更新延迟。
+  claude_extra_domain:
+    type: inline
+    behavior: domain
+    payload:
+      - "+.anthropic.com"
+      - "+.anthropic.team"
+      - "+.ant.dev"
+      - "+.antspace.dev"
+      - "+.chatbotclaude.com"
+      - "+.clau.de"
+      - "+.claude.ai"
+      - "+.claude.app"
+      - "+.claude.com"
+      - "+.claude.dev"
+      - "+.claude.new"
+      - "+.claude.site"
+      - "+.claudeacademy.com"
+      - "+.claudemcpclient.com"
+      - "+.claudemcpcontent.com"
+      - "+.claudepages.dev"
+      - "+.claudestudio.com"
+      - "+.claudeusercontent.com"
+      - "servd-anthropic-website.b-cdn.net"
+      # 官方 CLI 文档：插件元数据和旧版安装器；该主机也承载其他 GCS 桶。
+      - "storage.googleapis.com"
+      # 官方 CLI 文档：当前可选遥测，避免被广告分类拆到另一个出口。
+      - "http-intake.logs.us5.datadoghq.com"
+      - "browser-intake-us5-datadoghq.com"
+      # 社区及官方历史容器配置：旧版功能开关、统计端点。
+      - "+.statsig.com"
+      - "+.statsigcdn.com"
+      - "+.featuregates.org"
+      - "cdn.growthbook.io"
+      - "cdn.usefathom.com"
+      # 官方文档：Artifacts 可加载的字体和脚本 CDN，均为共享主机。
+      - "fonts.googleapis.com"
+      - "fonts.gstatic.com"
+      - "cdnjs.cloudflare.com"
+      - "cdn.jsdelivr.net"
+      - "cdn.tailwindcss.com"
+      - "code.jquery.com"
+      - "unpkg.com"
+  # 只使用官方 Inbound 网段；不把服务器对外访问的 Outbound 网段当 API 地址。
+  claude_ip:
+    type: inline
+    behavior: ipcidr
+    payload:
+      - "160.79.104.0/23"
+      - "153.61.224.0/22"
+      - "2607:6bc0::/48"
   openai_domain:
     type: http
     behavior: domain
@@ -261,13 +333,28 @@ rules:
   - RULE-SET,private_domain,DIRECT
   - RULE-SET,private_ip,DIRECT,no-resolve
 
-  # 国内域名按 cn_domain 分类直连，不由 DNS 返回的 IP 推断域名归属。
-  - RULE-SET,cn_domain,国内服务
+  # 原生 Claude 桌面端/CLI：补足共享 CDN、新域名和自定义 API 的进程请求。
+  # 不匹配 node、浏览器、git 等通用进程，避免接管其他应用。
+  - 'PROCESS-NAME-REGEX,(?i)^(claude(\.exe)?|claude-desktop|claude helper( \((renderer|gpu|plugin)\))?)$,Claude'
+  - 'AND,((NETWORK,udp),(PROCESS-NAME-REGEX,(?i)^(claude(\.exe)?|claude-desktop|claude helper( \((renderer|gpu|plugin)\))?)$)),REJECT'
 
-  # 未命中国内域名库的服务流量统一交给“通用代理”。
+  # Claude 优先于广告、Google 和其他 AI，登录、内容与功能开关使用同一出口。
+  - RULE-SET,claude_extra_domain,Claude
+  - AND,((NETWORK,udp),(RULE-SET,claude_extra_domain)),REJECT
+  - RULE-SET,claude_domain,Claude
+  - AND,((NETWORK,udp),(RULE-SET,claude_domain)),REJECT
+
+  # 其余广告优先于国内与服务分类，默认 REJECT。
+  - RULE-SET,ads_domain,广告拦截
+
+  # 独立服务优先于其他 AI 和国内分类；UDP 不支持时拒绝，避免落入其他分组。
   - RULE-SET,openai_domain,OpenAI
+  - AND,((NETWORK,udp),(RULE-SET,openai_domain)),REJECT
   - RULE-SET,youtube_domain,YouTube
   - RULE-SET,google_domain,Google
+  - AND,((NETWORK,udp),(RULE-SET,google_domain)),REJECT
+
+  # 其余服务流量交给各自分组，默认使用“通用代理”。
   - RULE-SET,other_ai_domain,其他AI
   - RULE-SET,github_domain,GitHub
   - RULE-SET,telegram_domain,Telegram
@@ -277,22 +364,27 @@ rules:
   - RULE-SET,microsoft_domain,Microsoft
   - RULE-SET,apple_domain,Apple
 
-  # 广告默认走代理，可选阻断，不能选择直连。
-  - RULE-SET,ads_domain,广告拦截
+  # 服务分类优先；其余国内域名按 cn_domain 分类直连。
+  - RULE-SET,cn_domain,国内服务
 
   # 国外域名先于 IP 规则；不为判断 IP 归属而解析未知域名。
   - RULE-SET,geolocation_noncn,通用代理
+
+  # 直接访问官方 API IP 时也使用 Claude 分组，不额外解析域名。
+  - RULE-SET,claude_ip,Claude,no-resolve
+  - AND,((NETWORK,udp),(RULE-SET,claude_ip,no-resolve)),REJECT
 
   # 未直连的域名 UDP：节点不支持 UDP 时必须拒绝，不能继续落到 IP 直连。
   - AND,((NETWORK,udp),(DOMAIN-REGEX,.+)),通用代理
   - AND,((NETWORK,udp),(DOMAIN-REGEX,.+)),REJECT
   - RULE-SET,cn_ip,国内服务,no-resolve
   - RULE-SET,google_ip,Google,no-resolve
+  - AND,((NETWORK,udp),(RULE-SET,google_ip,no-resolve)),REJECT
 
   # IP 形式的其余 UDP 同样先尝试代理、不支持则拒绝。
   # Mihomo 会跳过不支持 UDP 的代理规则，不能让它走到隐式 DIRECT。
   - NETWORK,udp,通用代理
   - NETWORK,udp,REJECT
 
-  # 所有其余 TCP/UDP 流量都走手动指定的海外节点，绝不兜底直连。
+  # 所有其余 TCP/UDP 流量交给“通用代理”，仅手动选择 DIRECT 时直连。
   - MATCH,通用代理
