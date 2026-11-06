@@ -14,7 +14,7 @@ https://raw.githubusercontent.com/dr1np/misub-ruleset/main/misub-metacubex-mihom
 - 服务分类优先于 `cn_domain` 国内域名与国内 IP 规则；其余国内流量默认直连。
 - 其余流量以 `MATCH,通用代理` 兜底，TCP、UDP 使用该组的当前选择。
 - 所有分组都有 `REJECT`；除 Claude、OpenAI、Google 外，所有分组都有 `DIRECT`。Microsoft、Apple 等服务组默认选择“通用代理”，国内服务默认 `DIRECT`。
-- Claude、OpenAI、Google 可分别选择 MiSub 注入的代理节点，并排除 `Direct`、`Compatible`、`Pass` 类型。这三组不引用“通用代理”，因此后者切到 `DIRECT` 时不会连带直连。三组和“通用代理”首次导入均默认 `REJECT`，请分别手动选择所需节点。
+- Claude、OpenAI、Google 可分别选择 MiSub 注入的代理节点，也可选择“通用代理”跟随其当前出口。三组不提供独立的 `DIRECT` 选项，并排除 `Direct`、`Compatible`、`Pass` 类型的注入节点；选择“通用代理”后，若该组切到 `DIRECT`，流量也会跟随直连。三组和“通用代理”首次导入均默认 `REJECT`，请手动选择所需节点或“通用代理”。
 - “通用代理”允许手动选择 `DIRECT`。选中节点连接失败时不会自动改走直连或其他节点。
 - 节点不支持 UDP 时，海外 UDP 由显式拒绝规则阻断，避免 Mihomo 跳过代理规则后隐式直连。
 - 广告拦截的选项顺序为 `REJECT`、通用代理、`DIRECT`，默认拦截。Claude 已确认的服务依赖优先进入 Claude，其余广告优先于其他服务和国内分类。
@@ -56,13 +56,13 @@ GitHub、npm、Homebrew、用户配置的 MCP、Bedrock/Vertex/Foundry、自定�
 
 实际验收时在 Mihomo 连接日志中检查网页登录、对话流式响应、文件上传/下载、Artifacts、Claude Code 登录与对话、插件列表、自动更新和 Chrome 桥接；确认目标请求命中 Claude 并使用选定节点。规则语法与离线分类检查不能代替带账号的端到端验证。
 
-本次验证使用 Mihomo 1.19.33：完整模板语法通过；18 个远程规则集均可下载，另有 3 个内置规则集；13 个分组选项、56 个域名/IP 的实际 TCP 路由、广告默认拒绝、Claude/OpenAI/Google 三组不支持 UDP 时的拒绝均通过。使用本地模拟代理检查出口，不调用厂商账号。另以测试用 `claude.exe` 验证未知域名的进程分流，并确认“通用代理”切到 `DIRECT` 不会改变三组的选中节点。
+本次验证使用 Mihomo 1.19.33：完整模板语法通过；18 个远程规则集均可下载，另有 3 个内置规则集；13 个分组选项、56 个域名/IP 的实际 TCP 路由、广告默认拒绝、Claude/OpenAI/Google 三组不支持 UDP 时的拒绝均通过。使用本地模拟代理检查出口，不调用厂商账号。另以测试用 `claude.exe` 验证未知域名的进程分流。三组选择独立节点时不受“通用代理”切换影响；选择“通用代理”时按其当前出口分流。
 
 ## DNS 与客户端设置
 
 普通公网域名统一使用经过“通用代理”当前选择的 Cloudflare / Google DoH。直连网站的 DNS 查询也使用该选择，没有国内 DNS 分流策略或自动直连回退。代理节点自身的域名使用独立的阿里 DoH 直连解析，避免在建立代理前依赖代理查询自身。这项引导解析不能提供与代理内查询相同的隐私边界。
 
-“通用代理”选中代理节点时，公网 DNS 经该节点；手动选中 `DIRECT` 时，DNS 也随之直连，Claude、OpenAI、Google 的连接仍使用各自节点。三组的独立分流不表示 DNS 查询也分别使用它们的出口。
+“通用代理”选中代理节点时，公网 DNS 经该节点；手动选中 `DIRECT` 时，DNS 也随之直连。Claude、OpenAI、Google 选择独立节点时，连接仍使用各自节点；选择“通用代理”时，连接也会跟随它直连。三组的独立分流不表示 DNS 查询也分别使用它们的出口。
 
 客户端需满足以下条件：
 
