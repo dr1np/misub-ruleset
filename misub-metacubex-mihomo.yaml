@@ -80,24 +80,24 @@ proxy-groups:
     exclude-type: "Compatible|Pass"
     empty-fallback: REJECT
 
-  # 三个服务组可独立选节点，也可选择“通用代理”跟随其当前出口。
+  # 三个服务组默认跟随“通用代理”，也可独立选节点。
   - name: Claude
     type: select
-    proxies: [REJECT, 通用代理]
+    proxies: [通用代理, REJECT]
     include-all: true
     exclude-type: "Direct|Compatible|Pass"
     empty-fallback: REJECT
 
   - name: OpenAI
     type: select
-    proxies: [REJECT, 通用代理]
+    proxies: [通用代理, REJECT]
     include-all: true
     exclude-type: "Direct|Compatible|Pass"
     empty-fallback: REJECT
 
   - name: Google
     type: select
-    proxies: [REJECT, 通用代理]
+    proxies: [通用代理, REJECT]
     include-all: true
     exclude-type: "Direct|Compatible|Pass"
     empty-fallback: REJECT

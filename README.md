@@ -14,7 +14,7 @@ https://raw.githubusercontent.com/dr1np/misub-ruleset/main/misub-metacubex-mihom
 - 服务分类优先于 `cn_domain` 国内域名与国内 IP 规则；其余国内流量默认直连。
 - 其余流量以 `MATCH,通用代理` 兜底，TCP、UDP 使用该组的当前选择。
 - 所有分组都有 `REJECT`；除 Claude、OpenAI、Google 外，所有分组都有 `DIRECT`。Microsoft、Apple 等服务组默认选择“通用代理”，国内服务默认 `DIRECT`。
-- Claude、OpenAI、Google 可分别选择 MiSub 注入的代理节点，也可选择“通用代理”跟随其当前出口。三组不提供独立的 `DIRECT` 选项，并排除 `Direct`、`Compatible`、`Pass` 类型的注入节点；选择“通用代理”后，若该组切到 `DIRECT`，流量也会跟随直连。三组和“通用代理”首次导入均默认 `REJECT`，请手动选择所需节点或“通用代理”。
+- Claude、OpenAI、Google 默认跟随“通用代理”，也可分别选择 MiSub 注入的代理节点或 `REJECT`。三组不提供独立的 `DIRECT` 选项，并排除 `Direct`、`Compatible`、`Pass` 类型的注入节点；跟随“通用代理”时，若该组切到 `DIRECT`，流量也会随之直连。
 - “通用代理”允许手动选择 `DIRECT`。选中节点连接失败时不会自动改走直连或其他节点。
 - 节点不支持 UDP 时，海外 UDP 由显式拒绝规则阻断，避免 Mihomo 跳过代理规则后隐式直连。
 - 广告拦截的选项顺序为 `REJECT`、通用代理、`DIRECT`，默认拦截。Claude 已确认的服务依赖优先进入 Claude，其余广告优先于其他服务和国内分类。
@@ -69,8 +69,8 @@ GitHub、npm、Homebrew、用户配置的 MCP、Bedrock/Vertex/Foundry、自定�
 1. 使用 Mihomo 的**规则模式**，关闭会覆盖模板的客户端 DNS 覆写。
 2. 开启 TUN、自动路由、严格路由及 UDP/TCP DNS 劫持；Windows 需服务模式或相应权限。模板已包含这些设置，Clash Verge 的界面设置仍可能覆盖它们。
 3. 保持模板的 IPv6 关闭设置，除非已另外验证 IPv6 的完整接管。
-4. 更新订阅后，分别检查“通用代理”、Claude、OpenAI、Google 的选中节点；首次导入默认阻断，需要手动选择。
-5. `profile.store-selected: true` 会保留已有选择；旧配置曾选中广告代理时，更新后请手动将“广告拦截”切到 `REJECT`。默认值针对没有已保存选择的导入。进程识别依赖客户端权限和运行环境。
+4. 首次导入时，Claude、OpenAI、Google 默认选择“通用代理”；在“通用代理”中选好节点，三组即可共用该出口。“通用代理”本身首次导入仍默认 `REJECT`。
+5. `profile.store-selected: true` 会保留已有选择。若更新后 Claude、OpenAI、Google 仍选中旧的 `REJECT`，请手动切到“通用代理”；若广告组保留了旧的代理选项，请手动切到 `REJECT`。进程识别依赖客户端权限和运行环境。
 
 “通用代理”的节点不可用时，使用该组的连接和公网 DNS 查询会失败；未缓存的国内域名、独立服务域名也可能因 DNS 无法经该组查询而暂时无法访问。已有国内域名/IP 直连规则不会因为海外节点掉线被改成代理。
 
