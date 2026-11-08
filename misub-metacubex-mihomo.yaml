@@ -122,6 +122,30 @@ proxy-groups:
     type: select
     proxies: [通用代理, REJECT, DIRECT]
 
+  - name: Steam 登录与好友
+    type: select
+    proxies: [DIRECT, 通用代理, REJECT]
+    include-all: true
+    exclude-type: "Compatible|Pass"
+
+  - name: Steam 下载与更新
+    type: select
+    proxies: [DIRECT, 通用代理, REJECT]
+    include-all: true
+    exclude-type: "Compatible|Pass"
+
+  - name: Steam 商店
+    type: select
+    proxies: [通用代理, DIRECT, REJECT]
+    include-all: true
+    exclude-type: "Compatible|Pass"
+
+  - name: Steam 社区
+    type: select
+    proxies: [通用代理, DIRECT, REJECT]
+    include-all: true
+    exclude-type: "Compatible|Pass"
+
   - name: Microsoft
     type: select
     proxies: [通用代理, REJECT, DIRECT]
@@ -139,9 +163,107 @@ proxy-groups:
     type: select
     proxies: [DIRECT, REJECT]
 
-# 远程规则集自动更新，使用 MRS 二进制格式；Claude 补充规则内置于模板。
+# 远程规则集自动更新，使用 MRS 二进制格式；Claude 和 Steam 的细分规则内置于模板。
 # 若 Github Raw 在你的运行环境不可访问，替换为可信的 GitHub 镜像。
 rule-providers:
+  # Steam 的专用主机先匹配，剩余的 steampowered/steamstatic 域名归商店。
+  steam_client:
+    type: inline
+    behavior: classical
+    payload:
+      - DOMAIN-SUFFIX,steamserver.net
+      - DOMAIN-SUFFIX,steam-chat.com
+      - DOMAIN-SUFFIX,steamconnecttest.com
+      - DOMAIN,api.steampowered.com
+      - DOMAIN,login.steampowered.com
+      - 'DOMAIN-REGEX,^clientconfig(\.[a-z0-9-]+)*\.steamstatic\.com$'
+
+  steam_download:
+    type: inline
+    behavior: classical
+    payload:
+      - DOMAIN-SUFFIX,steamcontent.com
+      - DOMAIN-SUFFIX,cs.steampowered.com
+      - DOMAIN,client-download.steampowered.com
+      - DOMAIN,repo.steampowered.com
+      - 'DOMAIN-REGEX,^content[0-9]+\.steampowered\.com$'
+      - 'DOMAIN-REGEX,^client-update(\.[a-z0-9-]+)*\.steamstatic\.com$'
+      - DOMAIN,steampipe.akamaized.net
+      - DOMAIN,steampipe-kr.akamaized.net
+      - DOMAIN,steampipe-partner.akamaized.net
+      # Steam 专用的 ISP/CDN 子域，不匹配这些运营商的整个域名。
+      - DOMAIN-SUFFIX,steam.cdn.on.net
+      - DOMAIN-SUFFIX,steam.eca.qtlglb.com
+      - DOMAIN-SUFFIX,steam.naeu.qtlglb.com
+      - DOMAIN-SUFFIX,steam.ru.qtlglb.com
+      - DOMAIN-SUFFIX,steam.apac.qtlglb.com
+      - DOMAIN-SUFFIX,steam.cdn.webra.ru
+      - DOMAIN-SUFFIX,edge.steam-dns.top.comcast.net
+      - DOMAIN-SUFFIX,steam.cdn.orcon.net.nz
+      - DOMAIN-SUFFIX,steam.cdn.slingshot.co.nz
+      - DOMAIN-SUFFIX,client-update.queniuqe.com
+      - DOMAIN-SUFFIX,dl.steam.clngaa.com
+      - DOMAIN-SUFFIX,st.dl.bscstorage.net
+      - DOMAIN-SUFFIX,st.dl.eccdnx.com
+      - DOMAIN-SUFFIX,st.dl.pinyuncloud.com
+      - DOMAIN-SUFFIX,steampowered.com.8686c.com
+      - DOMAIN-SUFFIX,steamstatic.com.8686c.com
+      - DOMAIN,lv.queniujq.cn
+      - DOMAIN,xz.pphimalayanrt.com
+      # 已知云存档传输端点，不匹配通用云存储。
+      - DOMAIN,steamcloudsweden.blob.core.windows.net
+      - 'DOMAIN-REGEX,^steamcloud-[a-z0-9-]+\.storage\.googleapis\.com$'
+
+  steam_community:
+    type: inline
+    behavior: classical
+    payload:
+      - DOMAIN-SUFFIX,steamcommunity.com
+      - DOMAIN-SUFFIX,steamusercontent.com
+      - DOMAIN-SUFFIX,steam.tv
+      - DOMAIN-SUFFIX,s.team
+      - 'DOMAIN-REGEX,^(community|avatars)(\.[a-z0-9-]+)*\.steamstatic\.com$'
+      - DOMAIN,steamcommunity-a.akamaihd.net
+      - DOMAIN,steamcommunity-a.akamaihd.net.edgesuite.net
+      - DOMAIN,steamusercontent-a.akamaihd.net
+      - DOMAIN,steamuserimages-a.akamaihd.net
+      - DOMAIN,steambroadcast.akamaized.net
+      - DOMAIN,steamugcquincy.blob.core.windows.net
+
+  steam_store:
+    type: inline
+    behavior: domain
+    payload:
+      - "+.steampowered.com"
+      - "+.steamstatic.com"
+      - "+.steamgames.com"
+      - "+.steamdeck.com"
+      - "steamstore-a.akamaihd.net"
+      - "steamcdn-a.akamaihd.net"
+      - "steamvideo-a.akamaihd.net"
+      - "steammobile.akamaized.net"
+
+  # Valve 官方 Steam 网络范围（as32590.net），仅用于无域名的连接。
+  steam_valve_ip:
+    type: inline
+    behavior: ipcidr
+    payload:
+      - "45.121.184.0/22"
+      - "103.10.124.0/23"
+      - "103.28.54.0/23"
+      - "146.66.152.0/21"
+      - "155.133.224.0/19"
+      - "162.254.192.0/21"
+      - "185.25.180.0/22"
+      - "192.69.96.0/22"
+      - "205.196.6.0/24"
+      - "208.64.200.0/22"
+      - "208.78.164.0/22"
+      - "2404:3fc0::/32"
+      - "2602:801:f000::/40"
+      - "2620:f9::/44"
+      - "2a01:bc80::/32"
+
   private_domain:
     type: http
     behavior: domain
@@ -344,6 +466,16 @@ rules:
   - RULE-SET,claude_domain,Claude
   - AND,((NETWORK,udp),(RULE-SET,claude_domain)),REJECT
 
+  # Steam 细分先于通用域名规则；选中的节点不支持 UDP 时拒绝继续匹配。
+  - RULE-SET,steam_download,Steam 下载与更新
+  - AND,((NETWORK,udp),(RULE-SET,steam_download)),REJECT
+  - RULE-SET,steam_client,Steam 登录与好友
+  - AND,((NETWORK,udp),(RULE-SET,steam_client)),REJECT
+  - RULE-SET,steam_community,Steam 社区
+  - AND,((NETWORK,udp),(RULE-SET,steam_community)),REJECT
+  - RULE-SET,steam_store,Steam 商店
+  - AND,((NETWORK,udp),(RULE-SET,steam_store)),REJECT
+
   # 其余广告优先于国内与服务分类，默认 REJECT。
   - RULE-SET,ads_domain,广告拦截
 
@@ -373,6 +505,10 @@ rules:
   # 直接访问官方 API IP 时也使用 Claude 分组，不额外解析域名。
   - RULE-SET,claude_ip,Claude,no-resolve
   - AND,((NETWORK,udp),(RULE-SET,claude_ip,no-resolve)),REJECT
+
+  # CM、语音或 Valve 中继可能直接连 IP；不解析域名来判断是否属于 Valve。
+  - AND,((NOT,((DOMAIN-REGEX,.+))),(RULE-SET,steam_valve_ip,no-resolve)),Steam 登录与好友
+  - AND,((NETWORK,udp),(NOT,((DOMAIN-REGEX,.+))),(RULE-SET,steam_valve_ip,no-resolve)),REJECT
 
   # 未直连的域名 UDP：节点不支持 UDP 时必须拒绝，不能继续落到 IP 直连。
   - AND,((NETWORK,udp),(DOMAIN-REGEX,.+)),通用代理

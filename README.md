@@ -21,6 +21,21 @@ https://raw.githubusercontent.com/dr1np/misub-ruleset/main/misub-metacubex-mihom
 
 规则先识别 Claude 原生进程和服务域名，再匹配带 `no-resolve` 的 IP 规则。未知域名不会为了判断是否属于国内 IP 而额外解析后直连；即使它最终解析到国内 CDN，也仍由“通用代理”兜底。直接访问国内 IP 时默认直连。域名归属以 MetaCubeX 的规则集为准。
 
+## Steam 分流
+
+| 分组 | 默认出口 | 覆盖范围 |
+| --- | --- | --- |
+| Steam 登录与好友 | `DIRECT` | 客户端登录、好友聊天、Steam API 和客户端配置；也匹配直接连接的 Valve 网络 IP，例如 CM 或语音中继 |
+| Steam 下载与更新 | `DIRECT` | SteamPipe 游戏下载、客户端更新、已知区域下载 CDN 和部分 Steam Cloud 传输端点 |
+| Steam 商店 | 通用代理 | 商店、结算、通用网页和静态资源，包括商店与社区共用的 `shared.*.steamstatic.com` |
+| Steam 社区 | 通用代理 | 社区页面、市场、创意工坊页面、头像和用户内容 |
+
+四组均可选择“通用代理”、`DIRECT`、`REJECT` 或订阅中的独立节点。客户端登录和好友连接默认直连；商店或社区页面中的网页登录仍随该页面分组。创意工坊页面走社区组，通过 SteamPipe 下载的工坊文件走下载组。HTTPS 共用域名无法按路径拆分；若商店和社区选择不同节点，共享静态资源仍随商店组。非 Valve 的游戏服务器继续按原规则匹配。
+
+裸 IP 仅匹配 [Steam 支持列出的 Valve 网络](https://help.steampowered.com/en/faqs/view/2EA8-4D75-DA21-31EB)，IPv4 和 IPv6 网段来自 Valve 链接的 [AS32590 IPv4](https://as32590.net/ipv4.txt) 与 [IPv6](https://as32590.net/ipv6.txt) 清单，核对于 2026-11-09。域名分类参考 [Steam 连接管理服务器目录](https://api.steampowered.com/ISteamDirectory/GetCMListForConnect/v1/?cellid=0)、[SteamPipe 下载服务器目录](https://api.steampowered.com/IContentServerDirectoryService/GetServersForSteamPipe/v1/?cell_id=0)、[SteamTracking 客户端更新清单](https://github.com/SteamTracking/SteamTracking/blob/master/urls.txt) 和 [MetaCubeX Steam 域名清单](https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/steam.list)。选用不支持 UDP 的节点时，对应的 Steam UDP 连接会被拒绝；语音等 UDP 功能建议保持直连或使用支持 UDP 的节点。
+
+Steam 的直连指连接出口，DNS 仍按下文配置。首次导入后请先为“通用代理”选好节点，让公网 DNS、Steam 商店和社区可用。
+
 ## Claude 覆盖范围与依据
 
 核对日期：2026-11-07。采用 MetaCubeX `anthropic.mrs` 每日更新，叠加模板内置规则，避免只匹配 `claude.ai` 而遗漏登录、文件或新产品域名。
@@ -56,7 +71,7 @@ GitHub、npm、Homebrew、用户配置的 MCP、Bedrock/Vertex/Foundry、自定�
 
 实际验收时在 Mihomo 连接日志中检查网页登录、对话流式响应、文件上传/下载、Artifacts、Claude Code 登录与对话、插件列表、自动更新和 Chrome 桥接；确认目标请求命中 Claude 并使用选定节点。规则语法与离线分类检查不能代替带账号的端到端验证。
 
-本次验证使用 Mihomo 1.19.33：完整模板语法通过；18 个远程规则集均可下载，另有 3 个内置规则集；13 个分组选项、56 个域名/IP 的实际 TCP 路由、广告默认拒绝、Claude/OpenAI/Google 三组不支持 UDP 时的拒绝均通过。使用本地模拟代理检查出口，不调用厂商账号。另以测试用 `claude.exe` 验证未知域名的进程分流。三组选择独立节点时不受“通用代理”切换影响；选择“通用代理”时按其当前出口分流。
+Claude 分流已使用 Mihomo 1.19.33 和本地模拟代理检查域名/IP 匹配、UDP 拒绝以及独立节点与通用代理的选择。另以测试用 `claude.exe` 验证未知域名的进程分流。三组选择独立节点时不受“通用代理”切换影响；选择“通用代理”时按其当前出口分流。
 
 ## DNS 与客户端设置
 
