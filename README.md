@@ -13,9 +13,9 @@ https://raw.githubusercontent.com/dr1np/misub-ruleset/main/misub-metacubex-mihom
 - 私有域名、局域网 IP 直连。
 - 服务分类优先于 `cn_domain` 国内域名与国内 IP 规则；其余国内流量默认直连。
 - 其余流量以 `MATCH,通用代理` 兜底，TCP、UDP 使用该组的当前选择。
-- 所有分组都有 `REJECT`；除 Claude、OpenAI、Google 外，所有分组都有 `DIRECT`。Microsoft、Apple 等服务组默认选择“通用代理”，国内服务默认 `DIRECT`。
-- Claude、OpenAI、Google 默认跟随“通用代理”，也可分别选择 MiSub 注入的代理节点或 `REJECT`。三组不提供独立的 `DIRECT` 选项，并排除 `Direct`、`Compatible`、`Pass` 类型的注入节点；跟随“通用代理”时，若该组切到 `DIRECT`，流量也会随之直连。
-- “通用代理”允许手动选择 `DIRECT`。选中节点连接失败时不会自动改走直连或其他节点。
+- 所有手动选择分组都有 `REJECT`；除 Claude、OpenAI、Google 外，手动选择分组都有 `DIRECT`。Microsoft、Apple 等服务组默认选择“通用代理”，国内服务默认 `DIRECT`。
+- Claude 默认 `REJECT`，OpenAI、Google 默认跟随“通用代理”。三组也可分别选择 MiSub 注入的代理节点或 `REJECT`，不提供独立的 `DIRECT` 选项，并排除 `Direct`、`Compatible`、`Pass` 类型的注入节点；手动选择跟随“通用代理”时，若该组切到 `DIRECT`，流量也会随之直连。
+- “通用代理”首次导入默认选中“自动选择”（`url-test`），也可手动选择独立节点、`REJECT` 或 `DIRECT`。“自动选择”对 MiSub 注入的代理节点进行 HTTPS 测速，间隔 300 秒、切换容差 50 ms，要求 HTTP 204；排除直连、拒绝等特殊出站，无候选节点时回退到 `REJECT`。手动选定独立节点时，连接失败不会自动改走其他节点；自动模式可根据测速结果切换代理节点，但不会自动回退直连。
 - 节点不支持 UDP 时，海外 UDP 由显式拒绝规则阻断，避免 Mihomo 跳过代理规则后隐式直连。
 - 广告拦截的选项顺序为 `REJECT`、通用代理、`DIRECT`，默认拦截。Claude 已确认的服务依赖优先进入 Claude，其余广告优先于其他服务和国内分类。
 
@@ -34,7 +34,7 @@ https://raw.githubusercontent.com/dr1np/misub-ruleset/main/misub-metacubex-mihom
 
 裸 IP 仅匹配 [Steam 支持列出的 Valve 网络](https://help.steampowered.com/en/faqs/view/2EA8-4D75-DA21-31EB)，IPv4 和 IPv6 网段来自 Valve 链接的 [AS32590 IPv4](https://as32590.net/ipv4.txt) 与 [IPv6](https://as32590.net/ipv6.txt) 清单，核对于 2026-11-09。域名分类参考 [Steam 连接管理服务器目录](https://api.steampowered.com/ISteamDirectory/GetCMListForConnect/v1/?cellid=0)、[SteamPipe 下载服务器目录](https://api.steampowered.com/IContentServerDirectoryService/GetServersForSteamPipe/v1/?cell_id=0)、[SteamTracking 客户端更新清单](https://github.com/SteamTracking/SteamTracking/blob/master/urls.txt) 和 [MetaCubeX Steam 域名清单](https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/steam.list)。选用不支持 UDP 的节点时，对应的 Steam UDP 连接会被拒绝；语音等 UDP 功能建议保持直连或使用支持 UDP 的节点。
 
-Steam 的直连指连接出口，DNS 仍按下文配置。首次导入后请先为“通用代理”选好节点，让公网 DNS、Steam 商店和社区可用。
+Steam 的直连指连接出口，DNS 仍按下文配置。首次导入时“通用代理”默认自动测速选择节点；也可手动选定节点，让公网 DNS、Steam 商店和社区可用。
 
 ## Claude 覆盖范围与依据
 
@@ -54,7 +54,7 @@ Steam 的直连指连接出口，DNS 仍按下文配置。首次导入后请先�
 
 Claude 域名和原生进程规则优先于广告、Google、其他AI及国内服务；其选中节点不支持 UDP 时立即 `REJECT`，不会落入其他分组。Claude 的功能开关和遥测属于该组的完整请求范围；需要关闭可选遥测时，使用 Claude 自身设置。
 
-共享域名有明确取舍：上述 GCS、字体、脚本 CDN 和遥测主机也可能被其他网站使用，它们的请求同样会进入 Claude。Mihomo 的域名规则不能根据 HTTPS URL 路径区分同一主机上的 Claude 对象和其他对象；没有把整个 `googleapis.com`、`gstatic.com`、`cloudflare.com`、`amazonaws.com` 或全部 CDN IP 加入 Claude。
+共享域名有明确取舍：上述 GCS、字体、脚本 CDN 和遥测主机也可能被其他网站使用，它们的请求同样会进入 Claude；由于 Claude 默认 `REJECT`，这些共享主机也会默认被阻断，直至手动调整 Claude 的选择。Mihomo 的域名规则不能根据 HTTPS URL 路径区分同一主机上的 Claude 对象和其他对象；没有把整个 `googleapis.com`、`gstatic.com`、`cloudflare.com`、`amazonaws.com` 或全部 CDN IP 加入 Claude。
 
 GitHub、npm、Homebrew、用户配置的 MCP、Bedrock/Vertex/Foundry、自定义网关和工具访问的任意网站，不存在可穷举的 Claude 专属域名清单。原生 Claude 进程直接发出的公网请求由进程规则覆盖；它启动的 `git`、`node`、`curl` 等子进程、npm 版 CLI、浏览器、WSL/容器流量若无法识别为 Claude，则按各自域名分类。没有全局匹配 `node.exe`、浏览器或 `git.exe`。远端云会话发出的请求也不经过本地 Mihomo。因此这里覆盖已核对的已知请求，不能承诺未来所有请求百分之百识别。
 
@@ -84,8 +84,8 @@ Claude 分流已使用 Mihomo 1.19.33 和本地模拟代理检查域名/IP 匹�
 1. 使用 Mihomo 的**规则模式**，关闭会覆盖模板的客户端 DNS 覆写。
 2. 开启 TUN、自动路由、严格路由及 UDP/TCP DNS 劫持；Windows 需服务模式或相应权限。模板已包含这些设置，Clash Verge 的界面设置仍可能覆盖它们。
 3. 保持模板的 IPv6 关闭设置，除非已另外验证 IPv6 的完整接管。
-4. 首次导入时，Claude、OpenAI、Google 默认选择“通用代理”；在“通用代理”中选好节点，三组即可共用该出口。“通用代理”本身首次导入仍默认 `REJECT`。
-5. `profile.store-selected: true` 会保留已有选择。若更新后 Claude、OpenAI、Google 仍选中旧的 `REJECT`，请手动切到“通用代理”；若广告组保留了旧的代理选项，请手动切到 `REJECT`。进程识别依赖客户端权限和运行环境。
+4. 首次导入时，“通用代理”默认选择“自动选择”，OpenAI、Google 默认跟随“通用代理”，Claude 默认 `REJECT`；需访问 Claude 时请手动为其选择独立节点或“通用代理”。
+5. `profile.store-selected: true` 会保留已有选择。更新已有配置后，若“通用代理”仍选中旧的 `REJECT` 或其他节点，请手动切到“自动选择”；若 Claude 仍选中旧的代理选项，请手动切到 `REJECT`。其他分组仍保留原有选择；进程识别依赖客户端权限和运行环境。
 
 “通用代理”的节点不可用时，使用该组的连接和公网 DNS 查询会失败；未缓存的国内域名、独立服务域名也可能因 DNS 无法经该组查询而暂时无法访问。已有国内域名/IP 直连规则不会因为海外节点掉线被改成代理。
 

@@ -74,16 +74,27 @@ dns:
 proxy-groups:
   - name: 通用代理
     type: select
-    # 首次导入先阻断，请手动选定海外节点；节点消失后也先阻断。
-    proxies: [REJECT, DIRECT]
+    # 首次导入默认自动测速选节点，仍可手动选择 REJECT、DIRECT 或独立节点。
+    proxies: [自动选择, REJECT, DIRECT]
     include-all: true
     exclude-type: "Compatible|Pass"
     empty-fallback: REJECT
 
-  # 三个服务组默认跟随“通用代理”，也可独立选节点。
+  - name: 自动选择
+    type: url-test
+    # MiSub 将订阅节点注入 proxies；不把直连或拒绝等特殊出站作为测速候选。
+    include-all-proxies: true
+    exclude-type: "Direct|Reject|RejectDrop|Compatible|Pass"
+    empty-fallback: REJECT
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+    expected-status: 204
+
+  # Claude 默认拒绝；OpenAI、Google 默认跟随“通用代理”，三组仍可独立选节点。
   - name: Claude
     type: select
-    proxies: [通用代理, REJECT]
+    proxies: [REJECT, 通用代理]
     include-all: true
     exclude-type: "Direct|Compatible|Pass"
     empty-fallback: REJECT
